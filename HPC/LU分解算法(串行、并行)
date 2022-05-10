@@ -1,0 +1,192 @@
+# 一、串行LU分解算法（详细见MIT线性代数）
+## 1. LU分解
+|矩阵分解|LU分解  |
+|--|--|
+|分解形式  |L（下三角矩阵）、U（上三角矩阵）  |
+|目的|提高计算效率|
+|**前提**|（1）矩阵A为方阵；（2）矩阵可逆（满秩矩阵）；（3）消元过程中没有0主元出现，也就是消元过程中不能出现行交换的初等变换|
+
+LU分解其实就是将线性方程组：
+$$ Ax = b$$
+分解为：
+$$ LUx = b$$
+这样一来就会有：
+$$\begin{cases}Ly = b \\ Ux = y \end{cases}$$
+先由下三角矩阵求解出y，再通过上三角矩阵完成对x的求解。
+## 2. Gussian Elimination
+高斯迭代求解其实就是我们在小学时候学习的二元一次方程组的解法。将一个方程中的未知数，用含有另一未知数的代数式来表示。比如：
+$$\left\{\begin{array}{l}x_{1}-2 x_{2}+x_{3}=0 \\ 2 x_{2}-8 x_{3}=8 \\ 5 x_{1}-5 x_{3}=10\end{array}\right.$$
+写成增广形式则有：
+$$\left[\begin{array}{ccc|c}1 & -2 & 1 & 0 \\ 0 & 2 & -8 & 8 \\ 5 & 0 & -5 & 10\end{array}\right]$$
+使用高斯迭代求解，先使用式1消去式3中的$x_1$，则有：
+$$\left[\begin{array}{ccc|c}1 & -2 & 1 & 0 \\ 0 & 2 & -8 & 8 \\ 0 & 10 & -10 & 10\end{array}\right]$$
+再使用式2消去式3中的$x_2$，则有：
+$$\left[\begin{array}{ccc|c}1 & -2 & 1 & 0 \\ 0 & 2 & -8 & 8 \\ 0 & 0 & 30 & -30\end{array}\right]$$
+最后通过这个上三角矩阵，可以很轻松的求解出x：
+$$\left\{\begin{array}{l}x_{1}-2 x_{2}+x_{3}=0 \\ x_{2}-4 x_{3}=4 \\ x_{3}=-1\end{array}\right.$$
+简单进行回代即可。
+```c
+void Guass(float *A,float *x,float *b,int n)
+{
+    float *At = (float *)malloc(sizeof(float)*n*n);
+    memcpy(At,A,sizeof(float)*n*n);
+    float *bt = (float *)malloc(sizeof(float)*n);
+    memcpy(bt,b,sizeof(float)*n);
+    for (int i=0;i<n;i++)
+    {
+		float pivot = At[i*n+i];   //对角线元素
+		for (int j=i+1;j<n;j++)
+		{
+	    	float scale=-At[j*n+i]/pivot;   //计算消元时所乘的系数
+	    	for (int k=0;k<n;k++)
+	    	{
+				At[j*n+k]+=scale*At[i*n+k];   //消去元素，一行每一个元素都要相加
+	    	}
+	    	bt[j]+=scale*bt[i];   //增广形式，向量也需要操作
+		}
+    }
+    printf("At=\n");
+    printMat(At,n);
+
+    printf("bt=\n");
+    printVec(bt,n);
+    
+    //回代解方程
+    for (int i=n-1;i>=0;i--)
+    {
+		float sum=0;
+		for (int j=i+1;j<n;j++)
+		{
+	    	sum+=At[i*n+j]*x[j];  //此处从最底层开始计算时不会进入此循环
+		}
+		x[i]=(bt[i]-sum)/At[i*n+i];
+    }
+    printf("x=\n");
+    printVec(x,n);
+
+    free(At);
+    free(bt);
+    free(x);
+}
+```
+执行结果如下图：
+![在这里插入图片描述](https://img-blog.csdnimg.cn/c6f44838e400478fb48acd96907ece73.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA5riF5qaO,size_20,color_FFFFFF,t_70,g_se,x_16#pic_center =300x300)
+## 3. 二者的联系
+可能大家已经看出来了最后消除完得到了一个上三角矩阵，其实高斯迭代最后所得的即为：$Ux=y$。
+
+但是有个疑问，下三角矩阵L又去哪了？
+这个地方就涉及到线代中的矩阵初等变换了，如图所示：
+![在这里插入图片描述](https://img-blog.csdnimg.cn/dd62a03e67a946519e786886dfbc5a7e.png)
+我们在高斯迭代时对于矩阵做了两次初等行变换，也就相当于在矩阵左边乘了两个初等矩阵：
+$$\left[\begin{array}{ccc}1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & -5 & 1\end{array}\right]\left[\begin{array}{ccc}1 & 0 & 0 \\ 0 & 1 & 0 \\ -5 & 0 & 1\end{array}\right]\left[\begin{array}{ccc|c}1 & -2 & 1 & 0 \\ 0 & 2 & -8 & 8 \\ 5 & 0 & -5 & 10\end{array}\right]=\left[\begin{array}{ccc|c}1 & -2 & 1 & 0 \\ 0 & 2 & -8 & 8 \\ 0 & 0 & 30 & -30\end{array}\right]$$
+将消元矩阵合并，用E表示则为：
+$$E A=\left[\begin{array}{ccc}1 & 0 & 0 \\ 0 & 1 & 0 \\ -5 & -5 & 1\end{array}\right]\left[\begin{array}{ccc|c}1 & -2 & 1 & 0 \\ 0 & 2 & -8 & 8 \\ 5 & 0 & -5 & 10\end{array}\right]=\left[\begin{array}{ccc|c}1 & -2 & 1 & 0 \\ 0 & 2 & -8 & 8 \\ 0 & 0 & 30 & -30\end{array}\right]=U$$
+两边在左乘$E^{-1}$则有：
+$$A=\left[\begin{array}{ccc|c}1 & -2 & 1 & 0 \\ 0 & 2 & -8 & 8 \\ 5 & 0 & -5 & 10\end{array}\right]=E^{-1} U=\left[\begin{array}{ccc}1 & 0 & 0 \\ 0 & 1 & 0 \\ 5 & 5 & 1\end{array}\right]\left[\begin{array}{ccc|c}1 & -2 & 1 & 0 \\ 0 & 2 & -8 & 8 \\ 0 & 0 & 30 & -30\end{array}\right]=L U$$
+这样就成功将矩阵A分解为了一个下三角矩阵（L）和一个上三角矩阵（U）的乘积。**但是需要注意的是并不是所有矩阵都可以分解，要求参见表1的前提！**
+
+```c
+void Lu_doolittle(float *A,float *x,float *b,int n)
+{
+    float *At = (float *)malloc(sizeof(float)*n*n);
+    memcpy(At,A,sizeof(float)*n*n);
+    float *bt = (float *)malloc(sizeof(float)*n);
+    memcpy(bt,b,sizeof(float)*n);
+
+    //为三角型矩阵L和U分配内存
+    float *L = (float *)malloc(sizeof(float)*n*n);
+    float *U = (float *)malloc(sizeof(float)*n*n);
+    memset(L,0,sizeof(float)*n*n);
+    memset(U,0,sizeof(float)*n*n);
+    //一边高斯消元一边记录相应的值，构成L和U
+    for (int i=0;i<n;i++)
+    {
+        float pivot =At[i*n+i];
+        for (int j=i+1;j<n;j++)
+        {
+            float scale=-At[j*n+i]/pivot;
+            At[j*n+i]=-scale;
+            for (int k=i+1;k<n;k++)
+            {
+                At[j*n+k]+=scale*At[i*n+k];
+            }
+        }
+    }
+    //给L矩阵赋值
+    for (int i=0;i<n;i++)
+    {
+        L[i*n+i]=1.00;	//对角线置为1
+        for (int j=0;j<i;j++)
+            L[i*n+j]=At[i*n+j];//给下方小三角赋值即可
+    }
+    //给U矩阵赋值
+    for (int i=0;i<n;i++)
+        for (int j=i;j<n;j++)
+            U[i*n+j]=At[i*n+j];
+	    
+    printf("L=\n");
+    printMat(L,n);
+
+    printf("U=\n");
+    printMat(U,n);
+    
+    float *y=(float *)malloc(sizeof(float)*n);
+    //从上向下解出向量y
+    for (int i=0;i<n;i++)
+    {
+        float sum=0;
+        for (int j=0;j<i;j++)
+            sum+=L[i*n+j]*y[j];
+        y[i]=(bt[i]-sum)/L[i*n+i];
+    }
+    //从下向上解出x
+    for (int i=n-1;i>=0;i--)
+    {
+        float sum=0;
+        for (int j=i+1;j<n;j++)
+            sum+=U[i*n+j]*x[j];
+        x[i]=(y[i]-sum)/U[i*n+i];
+    }
+
+    printf("x=\n");
+    printVec(x,n);
+}
+```
+
+## 4. 部分选主元的LU分解算法
+### 4.1 为什么要选主元？
+在进行LU分解时，**涉及到除法（计算pilot）**，<font color=FF0000> 如果分母太大则会导致不稳定的情况 </font>，如下所示：
+假设三位十进制浮点数下计算：
+$$\left(\begin{array}{ll}0.001 & 1.00 \\ 1.00 & 2.00\end{array}\right)\left(\begin{array}{l}x_{1} \\ x_{2}\end{array}\right)=\left(\begin{array}{l}1.00 \\ 3.00\end{array}\right)$$
+则有：$l_{21}=\frac{a_{21}}{a_{11}}=\frac{1.00}{0.001}=1000$
+$$L A=\left(\begin{array}{cc}1 & 0 \\ -1000 & 1\end{array}\right)\left(\begin{array}{cc}0.001 & 1.00 \\ 1.00 & 2.00\end{array}\right)=\left(\begin{array}{cc}0.001 & 1.00 \\ 0 & -1000\end{array}\right)=U$$
+此处的-1000在计算时不够精确，
+$$-1000 \times 1.00+1 \times 2.00=-0.100 \times 10^{4}+0.200 \times 10\quad=-0.100 \times 10^{4}+0.0002 \times 10^{4}=-0.100 \times 10^{4}=-1000$$
+此处的0.0002被舍去了，最后结果为：$x=(\mathbf{0}, \mathbf{1})^{\mathrm{T}}$，与精确值差距很大。
+### 4.2 列主元的LU分解算法（部分选主元）
+选主元其实就是为了避免分母很小影响精度的情况出现，因此**选取消元后的低阶矩阵内绝对值最大的元素作为主元**。此处仅接受**列主元的LU分解**，列主元只做行变换，相比全主元的方式，可以减少选择主元时的计算量，也可以避免记录交换信息。
+![在这里插入图片描述](https://img-blog.csdnimg.cn/1c5f59c7aa9247688746404ce8c5a0ba.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA5riF5qaO,size_20,color_FFFFFF,t_70,g_se,x_16)
+列选主元的LU分解算法其实就是**在进行高斯消元的过程中需要先选主元在消元**。在矩阵变换中相当于先左乘了一个初等矩阵进行行交换，然后又乘了一个矩阵进行消元。
+如下：
+$$A=\left(\begin{array}{ccc}-3 & 2 & 6 \\ 10& -7 & 0 \\ 5 & -1 & 5\end{array}\right)$$
+选主元10，交换第一行和第二行（等同于左乘初等矩阵P），然后进行高斯消元再左乘矩阵F，则有：
+$$P_{1}=\left(\begin{array}{lll}0 & 1 & 0 \\ 1 & 0 & 0 \\ 0 & 0 & 1\end{array}\right), \quad F_{1}=\left(\begin{array}{ccc}1 & \\ \frac{3}{10} & 1 & \\ -\frac{5}{10} & & 1\end{array}\right)$$
+此时：
+$$A^{(1)}=F_{1} P_{1} A=\left(\begin{array}{ccc}10 & -7 & 0 \\ 0 & -\frac{1}{10} & 6 \\ 0 & \frac{5}{2} & 5\end{array}\right)$$
+再次进行选主元，选择$\frac{5}{2}$，交换二三行，再进行高斯消元得：
+$$\boldsymbol{A}^{(2)}=\boldsymbol{F}_{2} \boldsymbol{P}_{2} \boldsymbol{A}^{(1)}=\left(\begin{array}{rrr}10 & -7 & 0 \\ & \frac{5}{2} & 5 \\ & & \frac{31}{5}\end{array}\right)$$
+
+记$A^{(2)}$为U，则有$F_{2} P_{2} F_{1} P_{1} A=U$，令$L^{-1}$为$F_{2} P_{2} F_{1} P_{1}$可得：
+$$A=LU=\left(\begin{array}{ccc}-\frac{3}{10} & -\frac{1}{25} & 1 \\ 1 & 0 & 0 \\ \frac{1}{2} & 1 & 0\end{array}\right)\left(\begin{array}{rrr}10 & -7 & 0 \\ & \frac{5}{2} & 5 \\ & \frac{31}{5}\end{array}\right)$$
+伪代码如下所示：
+![在这里插入图片描述](https://img-blog.csdnimg.cn/15b3604f50f349728ce166533eede175.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA5riF5qaO,size_20,color_FFFFFF,t_70,g_se,x_16#pic_center =350x300)
+# 二、列主元并行LU分解算法
+
+ - 每次选主元时，**只涉及到同一列**，因此没有数据通信。  
+ - 确定**主元后，计算 L 的第 k 列**  
+ - 将 l 和 L 的第 k 列传给其他结点    
+ - 各结点更新自己的数据
+ 
+伪代码如下所示：
+每个节点处理一列，确定主元后，计算消元所需的值，将其和主元位置进行广播。其他节点接收后先进行主元的交换，然后进行消元。
+![在这里插入图片描述](https://img-blog.csdnimg.cn/27339b640af64eb3afa40242054e52bf.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA5riF5qaO,size_20,color_FFFFFF,t_70,g_se,x_16)
